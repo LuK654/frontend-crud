@@ -1,9 +1,19 @@
 <template>
+  <!-- O seu template HTML permanece exatamente o mesmo -->
   <q-page padding>
     <q-card class="my-card">
-      <q-card-section>
-        <div class="text-h6">Lista de Utilizadores</div>
-        <div class="text-subtitle2">Dados recebidos da nossa API Backend</div>
+      <q-card-section class="row justify-between items-center">
+        <div>
+          <div class="text-h6">Lista de Utilizadores</div>
+          <div class="text-subtitle2">Dados recebidos da nossa API Backend</div>
+        </div>
+
+        <q-btn
+          label="Adicionar Utilizador"
+          color="primary"
+          icon="add"
+          @click="openCreateDialog"
+        />
       </q-card-section>
 
       <q-separator />
@@ -17,7 +27,7 @@
           <q-item v-for="user in users" :key="user.id">
             <q-item-section avatar>
               <q-avatar color="primary" text-color="white">
-                {{ user.nome.charAt(0) }}
+                {{ user.nome.charAt(0).toUpperCase() }}
               </q-avatar>
             </q-item-section>
             <q-item-section>
@@ -28,49 +38,124 @@
         </q-list>
       </q-card-section>
     </q-card>
+
+    <q-dialog v-model="showCreateDialog">
+      <q-card style="width: 500px">
+        <q-card-section>
+          <div class="text-h6">Criar Novo Utilizador</div>
+        </q-card-section>
+        <q-separator />
+        <q-card-section>
+          <q-form @submit="createUser">
+            <q-input
+              v-model="newUser.nome"
+              label="Nome *"
+              outlined
+              class="q-mb-md"
+              :rules="[val => !!val || 'O nome é obrigatório']"
+              lazy-rules
+            />
+            <q-input
+              v-model="newUser.email"
+              label="Email *"
+              type="email"
+              outlined
+              class="q-mb-md"
+              :rules="[val => !!val || 'O email é obrigatório']"
+              lazy-rules
+            />
+            <q-input
+              v-model="newUser.senha"
+              label="Senha *"
+              type="password"
+              outlined
+              class="q-mb-md"
+              :rules="[val => !!val || 'A senha é obrigatória']"
+              lazy-rules
+            />
+
+            <div class="row justify-end q-mt-md">
+              <q-btn label="Cancelar" color="grey" flat @click="showCreateDialog = false" />
+              <q-btn label="Criar Utilizador" type="submit" color="primary" class="q-ml-sm" />
+            </div>
+          </q-form>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { api } from 'boot/axios' // Importamos a nossa instância configurada do Axios!
+import { api } from 'boot/axios'
+// Importamos a função `useQuasar`
+import { useQuasar } from 'quasar'
 
 defineOptions({
   name: 'IndexPage'
 });
 
-// 1. REATIVIDADE:
-// Criamos uma variável reativa 'users'. O Vue irá "observar" esta variável.
-// Se o seu conteúdo mudar, o HTML será atualizado automaticamente.
-// Começa como uma lista vazia.
-const users = ref([]);
+// AQUI ESTÁ A FORMA CORRETA DE USAR:
+// Invocamos a função `useQuasar()` DENTRO do script setup do componente.
+const $q = useQuasar();
 
-// 2. CICLO DE VIDA:
-// A função onMounted() é um "gancho" do ciclo de vida. O código dentro dela
-// será executado assim que o componente for montado e estiver visível na tela.
-// É o momento perfeito para ir buscar os dados iniciais.
+// --- ESTADO REATIVO ---
+const users = ref([]);
+const showCreateDialog = ref(false);
+const newUser = ref({
+  nome: '',
+  email: '',
+  senha: ''
+});
+
+// --- CICLO DE VIDA ---
 onMounted(() => {
-  // Chamamos a função que vai buscar os dados à API.
   fetchUsers();
 });
 
-// 3. LÓGICA DA API:
-// Esta função assíncrona é responsável por comunicar com o nosso backend.
+// --- MÉTODOS ---
 const fetchUsers = async () => {
   try {
-    // Usamos a nossa instância 'api' para fazer uma requisição GET para o endpoint '/usuarios'.
-    // O Axios junta o baseURL com este caminho: http://localhost/API_CRUD/public/usuarios
     const response = await api.get('/usuarios');
-
-    // Quando a resposta chegar, atualizamos a nossa variável reativa 'users'.
-    // O .value é necessário porque estamos a usar ref().
-    // Assim que esta linha for executada, o Vue irá automaticamente atualizar a lista na tela!
     users.value = response.data;
+  } catch (error) {
+    console.error('Detalhes do erro ao buscar:', error);
+    const errorMessage = error.response?.data?.message || 'Falha ao buscar utilizadores. Verifique a consola.';
+    $q.notify({
+      color: 'negative',
+      message: errorMessage,
+      icon: 'report_problem'
+    })
+  }
+};
+
+const openCreateDialog = () => {
+  newUser.value = { nome: '', email: '', senha: '' };
+  showCreateDialog.value = true;
+};
+
+const createUser = async () => {
+  try {
+    const response = await api.post('/usuarios', newUser.value);
+
+    showCreateDialog.value = false;
+    $q.notify({
+      color: 'positive',
+      message: response.data.message || 'Utilizador criado com sucesso!',
+      icon: 'check_circle'
+    });
+    fetchUsers();
 
   } catch (error) {
-    // Se algo correr mal (ex: a API está offline), mostramos um erro na consola.
-    console.error('Erro ao buscar utilizadores:', error);
-    // No futuro, poderíamos mostrar uma notificação de erro para o utilizador.
+    console.error('Detalhes do erro ao criar utilizador:', error);
+    const errorMessage = error.response?.data?.message || 'Ocorreu uma falha ao criar o utilizador.';
+    $q.notify({
+      color: 'negative',
+      message: errorMessage,
+      icon: 'report_problem'
+    });
   }
 };
 </script>
+
